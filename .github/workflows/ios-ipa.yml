@@ -1,0 +1,50 @@
+name: Build unsigned IPA
+
+# 手动触发：Actions → Build unsigned IPA → Run workflow
+# 产出一个未签名 ipa，下载后可用 TrollStore（巨魔）直接安装，无需证书。
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        working-directory: ios/OnlineKefu
+        run: xcodegen generate
+
+      - name: Build (unsigned)
+        working-directory: ios/OnlineKefu
+        run: |
+          xcodebuild \
+            -project OnlineKefu.xcodeproj \
+            -scheme OnlineKefu \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            DEVELOPMENT_TEAM="" \
+            build
+
+      - name: Package IPA
+        run: |
+          set -e
+          APP="ios/OnlineKefu/build/Build/Products/Release-iphoneos/OnlineKefu.app"
+          test -d "$APP"
+          rm -rf out && mkdir -p out/Payload
+          cp -R "$APP" out/Payload/
+          cd out
+          zip -qry 在线客服.ipa Payload
+          ls -lh 在线客服.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 在线客服-unsigned-ipa
+          path: out/在线客服.ipa
